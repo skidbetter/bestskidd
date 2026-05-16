@@ -124,7 +124,7 @@ local Reach = {}
 local HitBoxes = {}
 local TrapDisabler
 local AntiFallPart
-local bedwars, remotes, sides, oldinvrender, oldSwing = {}, {}, {}
+local bedwars, remotes, sides, oldinvrender, oldSwing, rakNet = {}, {}, {}, false
 local originalKnit
 local function getAccountTier(player)
 	if getgenv().getAccountTier then
@@ -875,6 +875,10 @@ run(function()
 	vape:Clean(entitylib.Events.LocalAdded:Connect(updateVelocity))
 end)
 entitylib.start()
+
+run(function()
+	rakNet = typeof(raknet) == 'table'
+end)
 
 run(function()
 	local KnitInit, Knit
