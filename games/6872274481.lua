@@ -10409,7 +10409,8 @@ run(function()
 						})
 
 						if entity then
-							if getAccountTier(entity.Player) >= 4 and getAccountTier(entity.Player) < 99 and getAccountTier(lplr) == 0 then continue end
+							print(entity.Player,typeof(entity.Player))
+							if getAccountTier(entity.Player) >= 4 and getAccountTier(lplr) == 0 then continue end
 							store.BedAlarmIsTrigged = true
 
 							if ShowAlarm.Enabled then
