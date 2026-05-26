@@ -5184,6 +5184,7 @@ run(function()
 		Tooltip = 'Only attacks while swinging manually'
 	})
 end)
+																																																	
 -- granddad killaura
 local Attacking
 run(function()
