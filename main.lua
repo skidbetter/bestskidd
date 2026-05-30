@@ -109,9 +109,13 @@ pcall(migrateProfiles)
 --[[ ===== ANTILAG PERFORMANCE MODULE ===== ]]
 local antilag = {}
 local RunService = cloneref(game:GetService('RunService'))
-local deltaTime = 0
-local lastFrameTime = tick()
-local renderFrameCount = 0
+local antilagState = shared.R12SAAntilagState or {
+	deltaTime = 0,
+	lastFrameTime = tick(),
+	renderFrameCount = 0,
+	running = false
+}
+shared.R12SAAntilagState = antilagState
 
 -- Anti-lag config
 local ANTILAG_CONFIG = {
@@ -120,27 +124,30 @@ local ANTILAG_CONFIG = {
 }
 
 -- Frame time monitoring (detects and prevents lag spikes)
-task.spawn(function()
-	while true do
-		local currentTime = tick()
-		deltaTime = math.min(currentTime - lastFrameTime, ANTILAG_CONFIG.MAX_FRAME_TIME)
-		lastFrameTime = currentTime
-		RunService.RenderStepped:Wait()
-		renderFrameCount = renderFrameCount + 1
-	end
-end)
+if not antilagState.running then
+	antilagState.running = true
+	task.spawn(function()
+		while true do
+			local currentTime = tick()
+			antilagState.deltaTime = math.min(currentTime - antilagState.lastFrameTime, ANTILAG_CONFIG.MAX_FRAME_TIME)
+			antilagState.lastFrameTime = currentTime
+			RunService.RenderStepped:Wait()
+			antilagState.renderFrameCount = antilagState.renderFrameCount + 1
+		end
+	end)
+end
 
 function antilag.GetFrameTime()
-	return deltaTime
+	return antilagState.deltaTime
 end
 
 function antilag.GetFPS()
-	return 1 / math.max(deltaTime, 0.001)
+	return 1 / math.max(antilagState.deltaTime, 0.001)
 end
 
 function antilag.ThrottledWait(customInterval)
 	local interval = customInterval or 0.016
-	local adjustedInterval = math.max(interval, deltaTime)
+	local adjustedInterval = math.max(interval, antilagState.deltaTime)
 	if adjustedInterval > 0 then
 		task.wait(adjustedInterval)
 	else
@@ -151,8 +158,8 @@ end
 function antilag.GetStatus()
 	return {
 		fps = antilag.GetFPS(),
-		frameTime = deltaTime,
-		renderFrames = renderFrameCount,
+		frameTime = antilagState.deltaTime,
+		renderFrames = antilagState.renderFrameCount,
 	}
 end
 
