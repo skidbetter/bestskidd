@@ -4793,9 +4793,15 @@ run(function()
 							ViewmodelController = {
 								isVisible = function() return not Attacking end,
 								playAnimation = function(...)
-									if not Attacking then
-										bedwars.ViewmodelController:playAnimation(select(2, ...))
+
+									local animation = select(2, ...) or select(1, ...)
+
+									if not Attacking and animation then
+
+										bedwars.ViewmodelController:playAnimation(animation)
+
 									end
+
 								end
 							}
 						}
@@ -36811,6 +36817,7 @@ run(function()
 	local CURRENT_LEVEL_FROZEN = 0
 	local CurrentSwingTICK = 0
 	local originalLastAttack, originalLastSwingServerTime
+	local originalSwordEffectKnit, originalScytheKnit
 	local function restoreSwordState()
 		CURRENT_LEVEL_FROZEN = 0
 		store.KillauraTarget = nil
@@ -36826,10 +36833,14 @@ run(function()
 			bedwars.SwordController.lastSwingServerTime = originalLastSwingServerTime or workspace:GetServerTimeNow()
 		end
 		pcall(function()
-			debug.setupvalue(oldSwing or bedwars.SwordController.playSwordEffect, 6, bedwars.Knit)
+			if originalSwordEffectKnit ~= nil then
+				debug.setupvalue(oldSwing or bedwars.SwordController.playSwordEffect, 6, originalSwordEffectKnit)
+			end
 		end)
 		pcall(function()
-			debug.setupvalue(bedwars.ScytheController.playLocalAnimation, 3, bedwars.Knit)
+			if originalScytheKnit ~= nil then
+				debug.setupvalue(bedwars.ScytheController.playLocalAnimation, 3, originalScytheKnit)
+			end
 		end)
 		pcall(function()
 			if bedwars.InventoryViewmodelController and bedwars.Store then
@@ -37030,14 +37041,29 @@ run(function()
 									return not Attacking
 								end,
 								playAnimation = function(...)
-									if not Attacking then
-										bedwars.ViewmodelController:playAnimation(select(2, ...))
+
+									local animation = select(2, ...) or select(1, ...)
+
+									if not Attacking and animation then
+
+										bedwars.ViewmodelController:playAnimation(animation)
+
 									end
+
 								end
 							}
 						}
 					}
+					local _, swordEffectKnit = debug.getupvalue(oldSwing or bedwars.SwordController.playSwordEffect, 6)
+
+					local _, scytheKnit = debug.getupvalue(bedwars.ScytheController.playLocalAnimation, 3)
+
+					originalSwordEffectKnit = swordEffectKnit
+
+					originalScytheKnit = scytheKnit
+
 					debug.setupvalue(oldSwing or bedwars.SwordController.playSwordEffect, 6, fake)
+
 					debug.setupvalue(bedwars.ScytheController.playLocalAnimation, 3, fake)
 
 					task.spawn(function()
@@ -44003,6 +44029,7 @@ run(function()
 	local LegitAura = {}
 	local Particles, Boxes = {}, {}
 	local anims, AnimDelay, AnimTween, armC0 = vape.Libraries.auraanims, tick()
+	local originalSwordEffectKnit, originalScytheKnit
 	local AttackRemote = {FireServer = function() end}
 	task.spawn(function()
 		AttackRemote = bedwars.Client:Get(remotes.AttackEntity).instance
@@ -44050,14 +44077,29 @@ run(function()
 									return not Attacking
 								end,
 								playAnimation = function(...)
-									if not Attacking then
-										bedwars.ViewmodelController:playAnimation(select(2, ...))
+
+									local animation = select(2, ...) or select(1, ...)
+
+									if not Attacking and animation then
+
+										bedwars.ViewmodelController:playAnimation(animation)
+
 									end
+
 								end
 							}
 						}
 					}
+					local _, swordEffectKnit = debug.getupvalue(oldSwing or bedwars.SwordController.playSwordEffect, 6)
+
+					local _, scytheKnit = debug.getupvalue(bedwars.ScytheController.playLocalAnimation, 3)
+
+					originalSwordEffectKnit = swordEffectKnit
+
+					originalScytheKnit = scytheKnit
+
 					debug.setupvalue(oldSwing or bedwars.SwordController.playSwordEffect, 6, fake)
+
 					debug.setupvalue(bedwars.ScytheController.playLocalAnimation, 3, fake)
 
 					task.spawn(function()
@@ -44230,8 +44272,16 @@ run(function()
 						lplr.PlayerGui.MobileUI['2'].Visible = true
 					end)
 				end
-				debug.setupvalue(oldSwing or bedwars.SwordController.playSwordEffect, 6, bedwars.Knit)
-				debug.setupvalue(bedwars.ScytheController.playLocalAnimation, 3, bedwars.Knit)
+				pcall(function()
+					if originalSwordEffectKnit ~= nil then
+						debug.setupvalue(oldSwing or bedwars.SwordController.playSwordEffect, 6, originalSwordEffectKnit)
+					end
+				end)
+				pcall(function()
+					if originalScytheKnit ~= nil then
+						debug.setupvalue(bedwars.ScytheController.playLocalAnimation, 3, originalScytheKnit)
+					end
+				end)
 				Attacking = false
 				if armC0 then
 					AnimTween = tweenService:Create(gameCamera.Viewmodel.RightHand.RightWrist, TweenInfo.new(AnimationTween.Enabled and 0.001 or 0.3, Enum.EasingStyle.Exponential), {
