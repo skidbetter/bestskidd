@@ -58,6 +58,26 @@ local lplr = playersService.LocalPlayer
 local assetfunction = getcustomasset
 
 local vape = shared.vape
+local renderPerf = shared.R12SARenderPerf or {
+	smoothed = 1 / 60,
+	interval = 1 / 30
+}
+shared.R12SARenderPerf = renderPerf
+
+local function getAdaptiveRenderInterval(dt)
+	if dt and dt > 0 then
+		renderPerf.smoothed = (renderPerf.smoothed * 0.9) + (math.min(dt, 0.2) * 0.1)
+	end
+
+	local frame = renderPerf.smoothed
+	renderPerf.interval = frame > 0.055 and (1 / 12) or frame > 0.04 and (1 / 16) or frame > 0.028 and (1 / 22) or (1 / 30)
+	return renderPerf.interval
+end
+
+local function shouldRunRenderLoop(elapsed, dt)
+	return elapsed >= getAdaptiveRenderInterval(dt)
+end
+
 if vape and not vape.Clean then
 	vape.Clean = function(self, conn)
 		if not conn then return end
@@ -5373,19 +5393,23 @@ run(function()
 		if paFOVCircleDrawing then
 			paFOVCircleDrawing:Remove()
 			paFOVCircleDrawing = nil
-		end
-		if call then
-			paFOVCircleDrawing = Drawing.new('Circle')
-			paFOVCircleDrawing.Visible = false
-			paFOVCircleDrawing.Thickness = 1
-			paFOVCircleDrawing.Color = Color3.fromRGB(255, 255, 255)
-			paFOVCircleDrawing.Filled = false
-			paFOVCircleDrawing.NumSides = 64
-			paFOVCircleConnection = runService.RenderStepped:Connect(function()
-				if paFOVCircleDrawing and FOV and FOV.Value then
-					local shouldShow = false
-					if PAFOVCircle and PAFOVCircle.Enabled and ProjectileAimbot and ProjectileAimbot.Enabled then
-						local tool = store.hand and store.hand.tool
+			end
+			if call then
+				paFOVCircleDrawing = Drawing.new('Circle')
+				paFOVCircleDrawing.Visible = false
+				paFOVCircleDrawing.Thickness = 1
+				paFOVCircleDrawing.Color = Color3.fromRGB(255, 255, 255)
+				paFOVCircleDrawing.Filled = false
+				paFOVCircleDrawing.NumSides = 64
+				local fovElapsed = 0
+				paFOVCircleConnection = runService.RenderStepped:Connect(function(dt)
+					fovElapsed += dt
+					if not shouldRunRenderLoop(fovElapsed, dt) then return end
+					fovElapsed = 0
+					if paFOVCircleDrawing and FOV and FOV.Value then
+						local shouldShow = false
+						if PAFOVCircle and PAFOVCircle.Enabled and ProjectileAimbot and ProjectileAimbot.Enabled then
+							local tool = store.hand and store.hand.tool
 						local itemType = tool and tool.Name or ""
 						local itemMeta = bedwars.ItemMeta and bedwars.ItemMeta[itemType]
 						if itemMeta and itemMeta.projectileSource then
@@ -5561,15 +5585,19 @@ run(function()
 		Name = 'ProjectileAimbot',
 		Function = function(callback)
 			if callback then
-					if PAFOVCircle then
-						runPAFOVCircle(PAFOVCircle.Enabled)
-					end
-					if DesirePAHideCursor and DesirePAHideCursor.Enabled and not cursorRenderConnection then
-						cursorRenderConnection = runService.RenderStepped:Connect(function()
-							checkGUIState()
-							updateCursor()
-						end)
-					end
+						if PAFOVCircle then
+							runPAFOVCircle(PAFOVCircle.Enabled)
+						end
+						if DesirePAHideCursor and DesirePAHideCursor.Enabled and not cursorRenderConnection then
+							local cursorElapsed = 0
+							cursorRenderConnection = runService.RenderStepped:Connect(function(dt)
+								cursorElapsed += dt
+								if cursorElapsed < 0.25 then return end
+								cursorElapsed = 0
+								checkGUIState()
+								updateCursor()
+							end)
+						end
 
 					old = bedwars.ProjectileController.calculateImportantLaunchValues
 					bedwars.ProjectileController.calculateImportantLaunchValues = function(...)
@@ -5840,16 +5868,20 @@ run(function()
 		Function = function(callback)
 			if DesirePACursorViewMode then DesirePACursorViewMode.Object.Visible = callback end
 			if DesirePACursorLimitBow then DesirePACursorLimitBow.Object.Visible = callback end
-			if DesirePACursorShowGUI then DesirePACursorShowGUI.Object.Visible = callback end
-			if callback and ProjectileAimbot.Enabled then
-				if not cursorRenderConnection then
-					cursorRenderConnection = runService.RenderStepped:Connect(function()
-						checkGUIState()
-						updateCursor()
-					end)
-				end
-				updateCursor()
-			else
+				if DesirePACursorShowGUI then DesirePACursorShowGUI.Object.Visible = callback end
+				if callback and ProjectileAimbot.Enabled then
+					if not cursorRenderConnection then
+						local cursorElapsed = 0
+						cursorRenderConnection = runService.RenderStepped:Connect(function(dt)
+							cursorElapsed += dt
+							if cursorElapsed < 0.25 then return end
+							cursorElapsed = 0
+							checkGUIState()
+							updateCursor()
+						end)
+					end
+					updateCursor()
+				else
 				if cursorRenderConnection then
 					cursorRenderConnection:Disconnect()
 					cursorRenderConnection = nil
@@ -8225,15 +8257,15 @@ run(function()
                     end))
                 end
 
-                if Loop[methodused] then
-                    local nametagLoopElapsed = 0
-                    NameTags:Clean(runService.RenderStepped:Connect(function(dt)
-                        nametagLoopElapsed += dt
-                        if nametagLoopElapsed < (1 / 30) then return end
-                        nametagLoopElapsed = 0
-                        Loop[methodused]()
-                    end))
-                end
+	                if Loop[methodused] then
+	                    local nametagLoopElapsed = 0
+	                    NameTags:Clean(runService.RenderStepped:Connect(function(dt)
+	                        nametagLoopElapsed += dt
+	                        if not shouldRunRenderLoop(nametagLoopElapsed, dt) then return end
+	                        nametagLoopElapsed = 0
+	                        Loop[methodused]()
+	                    end))
+	                end
             else
                 if Removed[methodused] then
                     for i in Reference do
@@ -27230,21 +27262,25 @@ run(function()
 		end
 	end
 
-	local function startInvisibilityEnforcer(tool)
-		if invisConns[tool] then
-			pcall(function() invisConns[tool]:Disconnect() end)
-			invisConns[tool] = nil
-		end
-		local conn
-		conn = RunService.RenderStepped:Connect(function()
-			if not tool or not tool.Parent then
-				conn:Disconnect()
+		local function startInvisibilityEnforcer(tool)
+			if invisConns[tool] then
+				pcall(function() invisConns[tool]:Disconnect() end)
 				invisConns[tool] = nil
-				return
 			end
-			local reskin = tool:FindFirstChild("LOCAL_ITEM_RESKIN")
-			for _, d in ipairs(tool:GetDescendants()) do
-				if reskin and d:IsDescendantOf(reskin) then continue end
+			local conn
+			local elapsed = 0
+			conn = RunService.RenderStepped:Connect(function(dt)
+				if not tool or not tool.Parent then
+					conn:Disconnect()
+					invisConns[tool] = nil
+					return
+				end
+				elapsed += dt
+				if elapsed < 0.2 then return end
+				elapsed = 0
+				local reskin = tool:FindFirstChild("LOCAL_ITEM_RESKIN")
+				for _, d in ipairs(tool:GetDescendants()) do
+					if reskin and d:IsDescendantOf(reskin) then continue end
 				if d:IsA("BasePart") then
 					d.LocalTransparencyModifier = 1
 					d.Transparency = 1
@@ -27397,8 +27433,12 @@ run(function()
 
 			local start = time()
 			local conn
-			conn = RunService.RenderStepped:Connect(function()
+			local elapsed = 0
+			conn = RunService.RenderStepped:Connect(function(dt)
 				if not child.Parent then conn:Disconnect(); return end
+				elapsed += dt
+				if elapsed < 0.2 then return end
+				elapsed = 0
 				makeInvisible(child)
 				if time() - start > 3 then conn:Disconnect() end
 			end)
@@ -29875,10 +29915,14 @@ run(function()
 				motionBlurEffect = Instance.new('BlurEffect')
 				motionBlurEffect.Size = 0
 				motionBlurEffect.Parent = gameCamera
-				motionBlurConn = runService.RenderStepped:Connect(function()
-					local currentLook = gameCamera.CFrame.LookVector
-					local delta = (currentLook - lastLookVector).Magnitude
-					lastLookVector = currentLook
+					local blurElapsed = 0
+					motionBlurConn = runService.RenderStepped:Connect(function(dt)
+						blurElapsed += dt
+						if not shouldRunRenderLoop(blurElapsed, dt) then return end
+						blurElapsed = 0
+						local currentLook = gameCamera.CFrame.LookVector
+						local delta = (currentLook - lastLookVector).Magnitude
+						lastLookVector = currentLook
 					local targetSize = math.clamp(delta * (MotionBlurStrength.Value * 20), 0, 24)
 					motionBlurEffect.Size = motionBlurEffect.Size + (targetSize - motionBlurEffect.Size) * 0.3 
 				end)
@@ -39186,19 +39230,37 @@ end)
 
 run(function()
 	local NoNameTag
-	NoNameTag = vape.Categories.Legit:CreateModule({
-		Name = 'NoNameTag',
-        Tooltip = 'Removes your NameTag.',
-		Function = function(callback)
-			if callback then
-				NoNameTag:Clean(runService.RenderStepped:Connect(function()
-					pcall(function()
-						lplr.Character.Head.Nametag:Destroy()
-					end)
-				end))
-			end
-		end,
-	})
+		NoNameTag = vape.Categories.Legit:CreateModule({
+			Name = 'NoNameTag',
+	        Tooltip = 'Removes your NameTag.',
+			Function = function(callback)
+				if callback then
+					local function removeNametag()
+						pcall(function()
+							local character = lplr.Character
+							local head = character and character:FindFirstChild('Head')
+							local tag = head and head:FindFirstChild('Nametag')
+							if tag then
+								tag:Destroy()
+							end
+						end)
+					end
+
+					removeNametag()
+					NoNameTag:Clean(lplr.CharacterAdded:Connect(function(char)
+						local head = char:WaitForChild('Head', 5)
+						if head then
+							removeNametag()
+							NoNameTag:Clean(head.ChildAdded:Connect(function(child)
+								if child.Name == 'Nametag' then
+									child:Destroy()
+								end
+							end))
+						end
+					end))
+				end
+			end,
+		})
 end)
 
 -- Nerv8 block 44: [Render] CustomTags
@@ -39241,20 +39303,24 @@ run(function()
 			tagRenderConn:Disconnect()
 			tagRenderConn = nil
 		end
-		if tagGuiConn then
-			tagGuiConn:Disconnect()
-			tagGuiConn = nil
-		end
+			if tagGuiConn then
+				tagGuiConn:Disconnect()
+				tagGuiConn = nil
+			end
 
-		tagGuiConn = lplr.PlayerGui.ChildAdded:Connect(function(child)
-			if child.Name ~= "TabListScreenGui" or not child:IsA("ScreenGui") then return end
-			tagRenderConn = runService.RenderStepped:Connect(function()
-				local nameToFind = (lplr.DisplayName == "" or lplr.DisplayName == lplr.Name) and lplr.Name or lplr.DisplayName
-				for _, v in ipairs(child:GetDescendants()) do
-					if v:IsA("TextLabel") and string.find(string.lower(v.Text), string.lower(nameToFind)) then
-						v.Text = string.format('<font transparency="0.3" color="%s">[%s]</font> %s',Color3ToHex(R, G, B),TAG.Value,nameToFind)
+			tagGuiConn = lplr.PlayerGui.ChildAdded:Connect(function(child)
+				if child.Name ~= "TabListScreenGui" or not child:IsA("ScreenGui") then return end
+				local scanElapsed = 0
+				tagRenderConn = runService.RenderStepped:Connect(function(dt)
+					scanElapsed += dt
+					if not shouldRunRenderLoop(scanElapsed, dt) or scanElapsed < 0.25 then return end
+					scanElapsed = 0
+					local nameToFind = (lplr.DisplayName == "" or lplr.DisplayName == lplr.Name) and lplr.Name or lplr.DisplayName
+					for _, v in ipairs(child:GetDescendants()) do
+						if v:IsA("TextLabel") and string.find(string.lower(v.Text), string.lower(nameToFind)) then
+							v.Text = string.format('<font transparency="0.3" color="%s">[%s]</font> %s',Color3ToHex(R, G, B),TAG.Value,nameToFind)
+						end
 					end
-				end
 			end)
 		end)
 	end
@@ -40537,17 +40603,21 @@ run(function()
 									if reskin:IsA("Model") then
 										weldModelToPart(reskin, handle)
 									end
-									local start = time()
-									local conn
-									conn = runService.RenderStepped:Connect(function()
-										if not child.Parent then
-											conn:Disconnect()
-											return
-										end
+										local start = time()
+										local conn
+										local elapsed = 0
+										conn = runService.RenderStepped:Connect(function(dt)
+											if not child.Parent then
+												conn:Disconnect()
+												return
+											end
 
-										makeLocalInvisible(child)
+											elapsed += dt
+											if elapsed < 0.2 then return end
+											elapsed = 0
+											makeLocalInvisible(child)
 
-										if reskin and reskin.Parent and reskin:IsA("Model") and reskin.PrimaryPart then
+											if reskin and reskin.Parent and reskin:IsA("Model") and reskin.PrimaryPart then
 											pcall(function()
 												reskin:PivotTo(handle.CFrame * OFFSET_HELD)
 											end)
