@@ -44981,7 +44981,7 @@ run(function()
 	local funni
 	local last = os.clock()
 	funni = vape.Categories.Blatant:CreateModule({
-		Name = '🍰',
+		Name = 'Cake',
 		Tooltip = 'Gives you a sugar rush to dominate your opponents!',
 		Function = function(callback)
 			if callback then
