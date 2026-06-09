@@ -44977,3 +44977,24 @@ run(function()
 	})
 end)
 	
+run(function()
+	local funni
+	local last = os.clock()
+	funni = vape.Categories.Blatant:CreateModule({
+		Name = '🍰',
+		Tooltip = 'Gives you a sugar rush to dominate your opponents!',
+		Function = function(callback)
+			if callback then
+				repeat
+					if os.clock() - last >= 1 then
+						Client:Get('PlayerEatCake'):SendToServer({
+							block = replicatedStorage.Items.cake_one
+						})
+						last = os.clock()
+					end
+					task.wait()
+				until (not funni.Enabled)
+			end
+		end
+	})
+end)
