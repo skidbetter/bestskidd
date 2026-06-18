@@ -44308,6 +44308,103 @@ run(function()
 	})
 end)
 
+run(function()
+	local AutoVoidDrop
+	local OwlCheck
+	local DropToggles = {
+		iron = nil,
+		diamond = nil,
+		emerald = nil,
+		gold = nil
+	}
+	local cachedLowestPoint
+	local Delay
+
+	
+	AutoVoidDrop = vape.Categories.Utility:CreateModule({
+		Name = 'AutoVoidDrop',
+		Function = function(callback)
+			if callback then
+				repeat task.wait() until store.matchState ~= 0 or (not AutoVoidDrop.Enabled)
+				if not AutoVoidDrop.Enabled then return end
+
+				cachedLowestPoint = math.huge
+				for _, v in pairs(store.blocks) do
+					local point = (v.Position.Y - (v.Size.Y / 2)) - 50
+					if point < cachedLowestPoint then
+						cachedLowestPoint = point
+					end
+				end
+
+				repeat
+					if entitylib.isAlive then
+						local root = entitylib.character.RootPart
+						if root.Position.Y < cachedLowestPoint and (lplr.Character:GetAttribute('InflatedBalloons') or 0) <= 0 and not getItem('balloon') then
+							if not OwlCheck.Enabled or not root:FindFirstChild('OwlLiftForce') then
+								for itemType, toggle in pairs(DropToggles) do
+									if toggle.Enabled then
+										local item = getItem(itemType)
+										if item then
+											task.wait(Delay.Value)
+											local dropped = bedwars.Client:Get(remotes.DropItem):CallServer({
+												item = item.tool,
+												amount = item.amount
+											})
+		
+											if dropped then
+												dropped:SetAttribute('ClientDropTime', tick() + 100)
+											end
+										end
+									end
+								end
+								break
+							end
+						end
+					end
+
+					task.wait(0.1)
+				until not AutoVoidDrop.Enabled
+			end
+		end,
+		Tooltip = 'Drops resources when you fall into the void'
+	})
+	
+	OwlCheck = AutoVoidDrop:CreateToggle({
+		Name = 'Owl check',
+		Default = true,
+		Tooltip = 'Refuses to drop items if being picked up by an owl'
+	})
+	DropToggles.iron = AutoVoidDrop:CreateToggle({
+		Name = 'Drop Iron',
+		Tooltip = 'Drop iron when falling into void',
+		Default = true
+	})
+	DropToggles.diamond = AutoVoidDrop:CreateToggle({
+		Name = 'Drop Diamond',
+		Tooltip = 'Drop diamonds when falling into void',
+		Default = true
+	})
+	DropToggles.emerald = AutoVoidDrop:CreateToggle({
+		Name = 'Drop Emerald',
+		Tooltip = 'Drop emeralds when falling into void',
+		Default = true
+	})
+	DropToggles.gold = AutoVoidDrop:CreateToggle({
+		Name = 'Drop Gold',
+		Tooltip = 'Drop gold when falling into void',
+		Default = true
+	})
+	Delay = AutoVoidDrop:CreateSlider({
+		Name = 'Delay',
+		Min = 0,
+		Max = 2,
+		Decimal = 100,
+		Default = 0.1,
+		Suffix = 's'
+	})
+end)
+
+run(function()
 	local VoidDropTP
 	local Pickup
 	local OwnDrops
