@@ -44405,12 +44405,111 @@ run(function()
 end)
 
 run(function()
+	local AutoVoidDrop
+	local OwlCheck
+	local DropToggles = {
+		iron = nil,
+		diamond = nil,
+		emerald = nil,
+		gold = nil
+	}
+	local cachedLowestPoint
+	local Delay
+
+	
+	AutoVoidDrop = vape.Categories.Utility:CreateModule({
+		Name = 'AutoVoidDrop',
+		Function = function(callback)
+			if callback then
+				repeat task.wait() until store.matchState ~= 0 or (not AutoVoidDrop.Enabled)
+				if not AutoVoidDrop.Enabled then return end
+
+				cachedLowestPoint = math.huge
+				for _, v in pairs(store.blocks) do
+					local point = (v.Position.Y - (v.Size.Y / 2)) - 50
+					if point < cachedLowestPoint then
+						cachedLowestPoint = point
+					end
+				end
+
+				repeat
+					if entitylib.isAlive then
+						local root = entitylib.character.RootPart
+						if root.Position.Y < cachedLowestPoint and (lplr.Character:GetAttribute('InflatedBalloons') or 0) <= 0 and not getItem('balloon') then
+							if not OwlCheck.Enabled or not root:FindFirstChild('OwlLiftForce') then
+								for itemType, toggle in pairs(DropToggles) do
+									if toggle.Enabled then
+										local item = getItem(itemType)
+										if item then
+											task.wait(Delay.Value)
+											local dropped = bedwars.Client:Get(remotes.DropItem):CallServer({
+												item = item.tool,
+												amount = item.amount
+											})
+		
+											if dropped then
+												dropped:SetAttribute('ClientDropTime', tick() + 100)
+											end
+										end
+									end
+								end
+								break
+							end
+						end
+					end
+
+					task.wait(0.1)
+				until not AutoVoidDrop.Enabled
+			end
+		end,
+		Tooltip = 'Drops resources when you fall into the void'
+	})
+	
+	OwlCheck = AutoVoidDrop:CreateToggle({
+		Name = 'Owl check',
+		Default = true,
+		Tooltip = 'Refuses to drop items if being picked up by an owl'
+	})
+	DropToggles.iron = AutoVoidDrop:CreateToggle({
+		Name = 'Drop Iron',
+		Tooltip = 'Drop iron when falling into void',
+		Default = true
+	})
+	DropToggles.diamond = AutoVoidDrop:CreateToggle({
+		Name = 'Drop Diamond',
+		Tooltip = 'Drop diamonds when falling into void',
+		Default = true
+	})
+	DropToggles.emerald = AutoVoidDrop:CreateToggle({
+		Name = 'Drop Emerald',
+		Tooltip = 'Drop emeralds when falling into void',
+		Default = true
+	})
+	DropToggles.gold = AutoVoidDrop:CreateToggle({
+		Name = 'Drop Gold',
+		Tooltip = 'Drop gold when falling into void',
+		Default = true
+	})
+	Delay = AutoVoidDrop:CreateSlider({
+		Name = 'Delay',
+		Min = 0,
+		Max = 2,
+		Decimal = 100,
+		Default = 0.1,
+		Suffix = 's'
+	})
+end)
+
+run(function()
 	local VoidDropTP
 	local Pickup
 	local OwnDrops
+	local StealOthers
+	local ServerCheck
 	local ReturnHeight
 	local DropMemory = {}
 	local lastPickup = 0
+	local grabbing = {}
 
 	local function getDropPart(drop)
 		if not drop then return end
@@ -44444,24 +44543,91 @@ run(function()
 		}
 	end
 
-	local function tryPickup(drop, part)
-		if not Pickup.Enabled or (tick() - lastPickup) < 0.1 then return end
-		lastPickup = tick()
+	local function playPickupSound(drop, part)
+		if not bedwars.SoundList then return end
+		bedwars.SoundManager:playSound(bedwars.SoundList.PICKUP_ITEM_DROP)
 
+		local itemMeta = bedwars.ItemMeta[drop.Name]
+		local sound = itemMeta and itemMeta.pickUpOverlaySound
+		if sound then
+			bedwars.SoundManager:playSound(sound, {
+				position = part.Position,
+				volumeMultiplier = 0.9
+			})
+		end
+	end
+
+	local function moveDrop(drop, part, position)
+		pcall(function()
+			if drop:IsA('Model') then
+				drop:PivotTo(CFrame.new(position))
+			else
+				part.CFrame = CFrame.new(position)
+			end
+			part.AssemblyLinearVelocity = Vector3.zero
+			part.AssemblyAngularVelocity = Vector3.zero
+		end)
+	end
+
+	local function requestPickup(drop, part)
 		bedwars.Client:Get(remotes.PickupItem):CallServerAsync({
 			itemDrop = drop
 		}):andThen(function(suc)
-			if suc and bedwars.SoundList then
-				bedwars.SoundManager:playSound(bedwars.SoundList.PICKUP_ITEM_DROP)
-				local itemMeta = bedwars.ItemMeta[drop.Name]
-				local sound = itemMeta and itemMeta.pickUpOverlaySound
-				if sound then
-					bedwars.SoundManager:playSound(sound, {
-						position = part.Position,
-						volumeMultiplier = 0.9
-					})
-				end
+			if suc then
+				playPickupSound(drop, part)
 			end
+		end)
+
+		if part ~= drop then
+			bedwars.Client:Get(remotes.PickupItem):CallServerAsync({
+				itemDrop = part
+			})
+		end
+	end
+
+	local function tryPickup(drop, part, root)
+		if Pickup.Enabled and (tick() - lastPickup) < 0.1 then return end
+		if grabbing[drop] then return end
+		if Pickup.Enabled then
+			lastPickup = tick()
+		end
+		grabbing[drop] = true
+		local originalPosition = part.Position
+
+		task.spawn(function()
+			for _ = 1, 5 do
+				if not VoidDropTP.Enabled or not entitylib.isAlive or not root.Parent or not drop.Parent or not part.Parent then break end
+
+				local target = root.Position + (root.CFrame.LookVector * 2) + Vector3.new(0, 1.5, 0)
+				moveDrop(drop, part, target)
+
+				if firetouchinterest then
+					pcall(function()
+						firetouchinterest(root, part, 0)
+						firetouchinterest(root, part, 1)
+					end)
+				end
+
+				if Pickup.Enabled then
+					requestPickup(drop, part)
+				end
+
+				if Pickup.Enabled and ServerCheck.Enabled and not isnetworkowner(part) then
+					local old = root.CFrame
+					pcall(function()
+						root.CFrame = CFrame.new(originalPosition + Vector3.new(0, 2, 0))
+					end)
+					task.wait()
+					requestPickup(drop, part)
+					pcall(function()
+						root.CFrame = old
+					end)
+				end
+
+				task.wait(0.08)
+			end
+
+			grabbing[drop] = nil
 		end)
 	end
 
@@ -44498,27 +44664,17 @@ run(function()
 								memory = DropMemory[drop]
 							end
 
-							if OwnDrops.Enabled and not (memory and memory.fromSelf) then continue end
+							if OwnDrops.Enabled and not StealOthers.Enabled and not (memory and memory.fromSelf) then continue end
 							if part.Position.Y > lowestPoint then continue end
 
-							local target = root.Position + (root.CFrame.LookVector * 2) + Vector3.new(0, 1.5, 0)
-							pcall(function()
-								if drop:IsA('Model') then
-									drop:PivotTo(CFrame.new(target))
-								else
-									part.CFrame = CFrame.new(target)
-								end
-								part.AssemblyLinearVelocity = Vector3.zero
-								part.AssemblyAngularVelocity = Vector3.zero
-							end)
-
-							tryPickup(drop, part)
+							tryPickup(drop, part, root)
 						end
 					end
 					task.wait(0.05)
 				until not VoidDropTP.Enabled
 			else
 				table.clear(DropMemory)
+				table.clear(grabbing)
 				lastPickup = 0
 			end
 		end,
@@ -44530,10 +44686,20 @@ run(function()
 		Default = true,
 		Tooltip = 'Only recover drops that appeared near you'
 	})
+	StealOthers = VoidDropTP:CreateToggle({
+		Name = 'Steal Others',
+		Default = false,
+		Tooltip = 'Recover any player drop that falls into the void'
+	})
 	Pickup = VoidDropTP:CreateToggle({
 		Name = 'Auto Pickup',
 		Default = true,
 		Tooltip = 'Attempts to pick up recovered drops'
+	})
+	ServerCheck = VoidDropTP:CreateToggle({
+		Name = 'Server Check',
+		Default = true,
+		Tooltip = 'Briefly satisfies server pickup distance checks for other drops'
 	})
 	ReturnHeight = VoidDropTP:CreateSlider({
 		Name = 'Void Height',
@@ -44545,7 +44711,6 @@ run(function()
 		end
 	})
 end)
-
 run(function()
 	local LootGrabber
 	local Range
