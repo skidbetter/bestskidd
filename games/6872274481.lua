@@ -34452,7 +34452,1106 @@ end)
 
 -- Nerv8 block 29: [Blatant] Killaura
 
-https://www.youtube.com/shorts/BDW324YArwE
+run(function()
+	local CanHit = true
+	local MutiAura
+	local SophiaCheck
+	local MutiAuraDelay
+	local SyncHit
+	local Targets
+	local Sort
+	local SwingRange
+	local AttackRange
+	local AfterSwing
+	local UpdateRate
+	local AngleSlider
+	local MaxTargets
+	local Mouse
+	local Swing
+	local GUI
+	local BoxSwingColor
+	local BoxAttackColor
+	local ParticleTexture
+	local ParticleColor1
+	local ParticleColor2
+	local ParticleSize
+	local Face
+	local Animation
+	local AnimationMode
+	local AnimationSpeed
+	local AnimationTween
+	local Limit
+	local SC 
+	local RV
+	local HR
+	local FastHits
+	local HitsDelay
+	local AirHit
+	local AirHitsChance
+	local AfterSwing
+	local AfterSwingTime
+	local HitRegOption
+	local ACheck
+	local VisualiserRange
+	local HRTR = {
+		[1] = 0.042,
+		[2] = 0.0042,
+	}
+	local ClosetMode
+	local AttackMode
+	local LegitAura = {}
+	local Particles, Boxes = {}, {}
+	local rand = Random.new()
+	local anims, AnimDelay, AnimTween, armC0 = vape.Libraries.auraanims, tick()
+	local SwitchIndex = 1
+	local LastSwitchTime = 0
+	local SwitchDelay
+	local Visualiser
+	local AttackRemote = {}
+	local ASOPT
+	local ASMS
+	local LastAuraTarget = nil
+	local AfterSwingDone = false
+	local FROZEN_THRESHOLD = 10
+	local CURRENT_LEVEL_FROZEN = 0
+	local CurrentSwingTICK = 0
+	local originalLastAttack, originalLastSwingServerTime
+	local originalSwordEffectKnit, originalScytheKnit
+	local function restoreSwordState()
+		CURRENT_LEVEL_FROZEN = 0
+		store.KillauraTarget = nil
+		Attacking = false
+		CanHit = true
+		LastAuraTarget = nil
+		AfterSwingDone = false
+		CurrentSwingTICK = 0
+		if bedwars.SwordController then
+			if originalLastAttack ~= nil then
+				bedwars.SwordController.lastAttack = originalLastAttack
+			end
+			bedwars.SwordController.lastSwingServerTime = originalLastSwingServerTime or workspace:GetServerTimeNow()
+		end
+		pcall(function()
+			if originalSwordEffectKnit ~= nil then
+				debug.setupvalue(oldSwing or bedwars.SwordController.playSwordEffect, 6, originalSwordEffectKnit)
+			end
+		end)
+		pcall(function()
+			if originalScytheKnit ~= nil then
+				debug.setupvalue(bedwars.ScytheController.playLocalAnimation, 3, originalScytheKnit)
+			end
+		end)
+		pcall(function()
+			if bedwars.InventoryViewmodelController and bedwars.Store then
+				bedwars.InventoryViewmodelController:handleStore(bedwars.Store:getState())
+			end
+		end)
+	end
+    task.spawn(function()
+        AttackRemote = bedwars.Client:Get(remotes.AttackEntity)
+    end)
+	local lastCustomHitTime = 0
+
+	local function getAttackData()
+		if Mouse.Enabled then
+			if not inputService:IsMouseButtonPressed(0) then return false end
+		end
+
+		if GUI.Enabled then
+			if bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then return false end
+		end
+
+		local sword = Limit.Enabled and store.hand or store.tools.sword
+		if not sword or not sword.tool then return false end
+
+		local meta = bedwars.ItemMeta[sword.tool.Name]
+		if Limit.Enabled then
+			if store.hand.toolType ~= 'sword' or bedwars.DaoController.chargingMaid then return false end
+		end
+
+		if LegitAura.Enabled or ClosetMode.Enabled then
+			if (tick() - (bedwars.SwordController.lastSwing or 0)) >= 0.2 then
+				CanHit = false
+				return false 
+			else
+				CanHit = true
+			end
+		end
+
+		return sword, meta
+	end
+
+	local function MutiAuraFunction(Delay,Ade,v,pos,dir,actualRoot,sword)
+		if Ade then
+			task.wait(Delay)
+			for i, v in store.inventory.inventory.items do
+				local toolName = tostring(v.itemType)
+				local toolMeta = bedwars.ItemMeta[toolName]
+				if toolMeta and toolMeta.projectileSource then
+					local Slot = getObjSlot(toolName)
+					if Slot then
+						local switched = hotbarSwitch(Slot)
+						if switched then
+							mouse1click()
+						end
+					end
+				end
+				task.wait(Delay)
+			end
+		else
+			task.wait(Delay)
+			for i, v in store.inventory.inventory.items do
+				local toolName = tostring(v.itemType)
+				local toolMeta = bedwars.ItemMeta[toolName]
+				if toolMeta and toolMeta.projectileSource then
+					local Slot = getObjSlot(toolName)
+					
+					if Slot then
+						local switched = hotbarSwitch(Slot)
+						if switched then
+							mouse1click()
+						end
+					end
+				end
+				task.wait(Delay)
+			end
+		end
+	end
+
+	local function canHitWithCustomReg()
+		if not HitRegOption.Enabled then
+			return true
+		end
+		local currentTime = tick()
+		local delayBetweenHits = (10 / HR.Value) * 0.98
+		if HR.Value >= 36 then
+			return true
+		end
+		if currentTime - lastCustomHitTime >= delayBetweenHits then
+			lastCustomHitTime = currentTime
+			return true
+		end
+		return false
+	end
+
+
+	local function OptimizedAttackData(attackTable)
+        if not AttackRemote then return end
+        if not canHitWithCustomReg() then return end
+		local CanAttackAC = bedwars.SwordController:getTargetInRegion(AttackRange.Value * 3, 0)
+		if not ACheck.Enabled then
+			CanAttackAC = true
+		end
+		if not CanAttackAC then return end
+        local suc, plr = pcall(function()
+            return playersService:GetPlayerFromCharacter(attackTable.entityInstance)
+        end)
+
+        local selfpos = attackTable.validate.selfPosition.value
+        local targetpos = attackTable.validate.targetPosition.value
+        local actualDistance = (selfpos - targetpos).Magnitude
+
+        store.attackReach = (actualDistance * 100) // 1 / 100
+        store.attackReachUpdate = tick() + 1
+
+        if actualDistance > 14.4 and actualDistance <= 30 then
+            local direction = (targetpos - selfpos).Unit
+            
+            local moveDistance = math.min(actualDistance - 14.3, 8) 
+            attackTable.validate.selfPosition.value = selfpos + (direction * moveDistance)
+            
+            local pullDistance = math.min(actualDistance - 14.3, 4)
+            attackTable.validate.targetPosition.value = targetpos - (direction * pullDistance)
+            
+            attackTable.validate.raycast = attackTable.validate.raycast or {}
+            attackTable.validate.raycast.cameraPosition = attackTable.validate.raycast.cameraPosition or {}
+            attackTable.validate.raycast.cursorDirection = attackTable.validate.raycast.cursorDirection or {}
+            
+            local extendedOrigin = selfpos + (direction * math.min(actualDistance - 12, 15))
+            attackTable.validate.raycast.cameraPosition.value = extendedOrigin
+            attackTable.validate.raycast.cursorDirection.value = direction
+            
+            attackTable.validate.targetPosition = attackTable.validate.targetPosition or {value = targetpos}
+            attackTable.validate.selfPosition = attackTable.validate.selfPosition or {value = selfpos}
+        end
+
+        if suc and plr then
+            if not select(2, whitelist:get(plr)) then return end
+        end
+
+        return AttackRemote:SendToServer(attackTable)
+	end
+
+	local function resolveAttackTargets(plrs)
+		if #plrs == 0 then return {} end
+		if AttackMode.Value == "Multi" then
+			return plrs
+		end
+		if AttackMode.Value == "Single" then
+			local rng = math.random(1,#plrs)
+			local index = plrs[rng]
+			return {index}
+		end
+		if AttackMode.Value == "Switch" then
+			local now = tick()
+			if now - LastSwitchTime >= SwitchDelay.Value then
+				SwitchIndex += 1
+				if SwitchIndex > #plrs then
+					SwitchIndex = 1
+				end
+				LastSwitchTime = now
+			end
+			return {plrs[SwitchIndex]}
+		end
+		return plrs
+	end
+
+    local function createRangeCircle()
+        Visualiser = Instance.new("MeshPart")
+        Visualiser.MeshId = "rbxassetid://3726303797"
+        Visualiser.Color = Color3.fromRGB(155,155,155)
+        Visualiser.CanCollide = false
+        Visualiser.Anchored = true
+        Visualiser.Material = Enum.Material.Neon
+        Visualiser.Size = Vector3.new(SwingRange.Value * 0.7, 0.01, SwingRange.Value * 0.7)
+        if Killaura.Enabled then
+            Visualiser.Parent = gameCamera
+        end
+		bedwars.QueryUtil:setQueryIgnored(Visualiser, true)
+    end
+
+	Killaura = vape.Categories.Blatant:CreateModule({
+		Name = 'Killaura',
+		Function = function(callback)
+			if callback then
+				originalLastAttack = bedwars.SwordController and bedwars.SwordController.lastAttack or nil
+				originalLastSwingServerTime = bedwars.SwordController and bedwars.SwordController.lastSwingServerTime or nil
+				if inputService.TouchEnabled then
+					pcall(function()
+						lplr.PlayerGui.MobileUI['2'].Visible = Limit.Enabled
+					end)
+				end
+
+				if Animation.Enabled and not (identifyexecutor and table.find({'Argon', 'Delta','Codex'}, ({identifyexecutor()})[1])) then
+					local fake = {
+						Controllers = {
+							ViewmodelController = {
+								isVisible = function()
+									return not Attacking
+								end,
+								playAnimation = function(...)
+
+									local animation = select(2, ...) or select(1, ...)
+
+									if not Attacking and animation then
+
+										bedwars.ViewmodelController:playAnimation(animation)
+
+									end
+
+								end
+							}
+						}
+					}
+					local _, swordEffectKnit = debug.getupvalue(oldSwing or bedwars.SwordController.playSwordEffect, 6)
+
+					local _, scytheKnit = debug.getupvalue(bedwars.ScytheController.playLocalAnimation, 3)
+
+					originalSwordEffectKnit = swordEffectKnit
+
+					originalScytheKnit = scytheKnit
+
+					debug.setupvalue(oldSwing or bedwars.SwordController.playSwordEffect, 6, fake)
+
+					debug.setupvalue(bedwars.ScytheController.playLocalAnimation, 3, fake)
+
+					task.spawn(function()
+						local started = false
+						repeat
+							if Attacking then
+								if not armC0 then
+									armC0 = gameCamera.Viewmodel.RightHand.RightWrist.C0
+								end
+								local first = not started
+								started = true
+
+								if AnimationMode.Value == 'Random' then
+									anims.Random = {{CFrame = CFrame.Angles(math.rad(math.random(1, 360)), math.rad(math.random(1, 360)), math.rad(math.random(1, 360))), Time = 0.12}}
+								end
+
+								for _, v in anims[AnimationMode.Value] do
+									AnimTween = tweenService:Create(gameCamera.Viewmodel.RightHand.RightWrist, TweenInfo.new(first and (AnimationTween.Enabled and 0.001 or 0.1) or v.Time / AnimationSpeed.Value, Enum.EasingStyle.Linear), {
+										C0 = armC0 * v.CFrame
+									})
+									AnimTween:Play()
+									AnimTween.Completed:Wait()
+									first = false
+									if (not Killaura.Enabled) or (not Attacking) then break end
+								end
+							elseif started then
+								started = false
+								AnimTween = tweenService:Create(gameCamera.Viewmodel.RightHand.RightWrist, TweenInfo.new(AnimationTween.Enabled and 0.001 or 0.3, Enum.EasingStyle.Exponential), {
+									C0 = armC0
+								})
+								AnimTween:Play()
+							end
+
+							if not started then
+								task.wait(1 / UpdateRate.Value)
+							end
+						until (not Killaura.Enabled) or (not Animation.Enabled)
+					end)
+				end
+
+				local swingCooldown = 0
+				repeat
+					if SophiaCheck.Enabled then
+						CURRENT_LEVEL_FROZEN = lplr.Character:GetAttribute("ColdStacks") or lplr.Character:GetAttribute("FrostStacks") or lplr.Character:GetAttribute("FreezeStacks") or 0
+						if CURRENT_LEVEL_FROZEN >= FROZEN_THRESHOLD then
+							Attacking = false
+							store.KillauraTarget = nil
+							task.wait(0.3)
+							continue
+						end
+						if not entitylib.isAlive then
+							CURRENT_LEVEL_FROZEN = 0
+						end
+					end					
+					local attacked, sword, meta = {}, getAttackData()
+                    pcall(function()
+                        if entitylib.isAlive and entitylib.character.HumanoidRootPart then
+                            tweenService:Create(Visualiser, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = entitylib.character.HumanoidRootPart.Position - Vector3.new(0, entitylib.character.Humanoid.HipHeight, 0)}):Play()
+                        end
+                    end)
+					Attacking = false
+					store.KillauraTarget = nil
+					if sword then
+						if SC.Enabled and entitylib.isAlive and lplr.Character:FindFirstChild("elk") then task.wait(math.max(ChargeTime.Value, 0.08)) continue end
+						local isAde = string.find(string.lower(tostring(sword and sword.itemType or "")), "frost_hammer")	
+						local nonplrs = entitylib.AllPosition({
+							Range = ClosetMode.Enabled and 20 or SwingRange.Value,
+							Wallcheck = ClosetMode.Enabled and true or Targets.Walls.Enabled or nil,
+							Part = 'RootPart',
+							Players = ClosetMode.Enabled and true or Targets.Players.Enabled,
+							NPCs = ClosetMode.Enabled and false or Targets.NPCs.Enabled,
+							Limit = ClosetMode.Enabled and 1 or MaxTargets.Value,
+							Sort = sortmethods[Sort.Value]
+						})
+						local plrs = resolveAttackTargets(nonplrs)
+						if #plrs > 0 then
+							if store.equippedKit == "ember" and sword.itemType == "infernal_saber" then
+								bedwars.Client:Get('HellBladeRelease'):FireServer({chargeTime = 1, player = lplr, weapon = sword.tool})
+							end
+							local selfpos = entitylib.character.RootPart.Position
+							local localfacing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1, 0, 1)
+
+							for _, v in plrs do
+								local delta = (v.RootPart.Position - selfpos)
+								local flatDelta = delta * Vector3.new(1, 0, 1)
+								if flatDelta.Magnitude < 0.01 then continue end
+								local dir = flatDelta.Unit
+								local dot = localfacing:Dot(dir)
+								local minDot = math.cos(math.rad(AngleSlider.Value) * 0.5)
+								if dot < minDot then continue end
+
+								local num = 0
+								num = ClosetMode.Enabled and 13 or AttackRange.Value 
+								table.insert(attacked, {
+									Entity = v,
+									Check = delta.Magnitude > num and BoxSwingColor or BoxAttackColor
+								})
+								targetinfo.Targets[v] = tick() + 1 - 0.005
+
+								if not Attacking then
+									Attacking = true
+									store.KillauraTarget = v
+									LastAuraTarget = v
+									AfterSwingDone = false
+									if not Swing.Enabled and AnimDelay < tick() and not LegitAura.Enabled then
+										AnimDelay = tick() + (meta.sword.respectAttackSpeedForEffects and meta.sword.attackSpeed or math.max(ChargeTime.Value, 0.11))
+										if not ClosetMode.Enabled or not LegitAura.Enabled then
+											bedwars.SwordController:playSwordEffect(meta, false)
+										end
+										if meta.displayName:find(' Scythe') then
+											bedwars.ScytheController:playLocalAnimation()
+										end
+
+										if vape.ThreadFix then
+											setthreadidentity(8)
+										end
+									end
+								end
+
+								if delta.Magnitude > num then continue end
+
+  								if SyncHit.Enabled then
+                                    local swingSpeed =  ChargeTime.Value
+                                    if (tick() - CurrentSwingTICK) < (swingSpeed * 0.7) then 
+                                        continue 
+                                    end
+                                    local timeSinceLastSwing = tick() - CurrentSwingTICK * (1.98 / (meta.sword.respectAttackSpeedForEffects and meta.sword.attackSpeed + math.max(ChargeTime.Value, 0.08)))
+                                    local requiredDelay = math.max(swingSpeed * 0.8, 0.1) 
+                                    if timeSinceLastSwing < requiredDelay then 
+                                        continue 
+                                    end
+                                end
+
+
+								local actualRoot = v.Character.PrimaryPart
+								if actualRoot then
+									--CurrentSwingTICK = tick()
+									local dir = CFrame.lookAt(selfpos, actualRoot.Position).LookVector
+									local pos = selfpos + dir * math.max(delta.Magnitude - 14.399, 0)
+									swingCooldown = SyncHit.Enabled and (tick() - HRTR[1]) or tick()
+									bedwars.SwordController.lastAttack = workspace:GetServerTimeNow()
+										if SyncHit.Enabled then
+											bedwars.SwordController.lastSwingServerTime = workspace:GetServerTimeNow() - HRTR[2]
+										end
+									store.attackReach = SyncHit.Enabled and ((delta.Magnitude * 100) // 1 / 100 - HRTR[1] - 0.055) or (delta.Magnitude * 100) // 1 / 100
+									store.attackReachUpdate = SyncHit.Enabled and (tick() + 1 - HRTR[2]) or tick() 
+									if not SyncHit.Enabled or (tick() - CurrentSwingTICK) >= 0.1 then
+                                        CurrentSwingTICK = tick()
+                                    end
+									if delta.Magnitude < 14.4 and ChargeTime.Value > 0.11 then
+										AnimDelay =  tick()
+									end
+									local Q = 0.5
+									if MutiAura.Enabled and not ClosetMode.Enabled then
+										if AirHit.Enabled or ClosetMode.Enabled then
+											local chance =  math.random(0,100)
+											local state = v.Character.Humanoid:GetState()
+											if state == Enum.HumanoidStateType.Jumping then
+												if chance > AirHitsChance.Value then 
+													CanHit = false
+													continue
+												else
+													CanHit = true
+												end
+											elseif state == Enum.HumanoidStateType.Freefall then
+												if chance > AirHitsChance.Value then
+													CanHit = false 
+													continue 
+												else
+													CanHit = true
+												end
+											else
+												CanHit = true
+											end
+										else
+											CanHit = true
+										end
+										if CanHit then
+											local Delay = (MutiAuraDelay.Value / 1000)
+											local rng = math.random(0,100)
+											if rng >= 58 then -- TEMP NUMBER FOR NOW
+												if isAde then
+													local Data = {
+														weapon = sword.tool,
+														chargedAttack = {chargeRatio = 0},
+														entityInstance = v.Character,
+														validate = {
+															raycast = {cameraPosition = {value = pos + Vector3.new(0, 2, 0)}, cursorDirection = {value = dir}},
+															targetPosition = {value = actualRoot.Position},
+															selfPosition = {value = pos+ Vector3.new(0, 1, 0)}
+														}
+													}
+													OptimizedAttackData(Data)
+												else
+													local Data = {
+														weapon = sword.tool,
+														chargedAttack = {chargeRatio = 0},
+														entityInstance = v.Character,
+														validate = {
+															raycast = {cameraPosition = {value = pos + Vector3.new(0, 2, 0)}, cursorDirection = {value = dir}},
+															targetPosition = {value = actualRoot.Position},
+															selfPosition = {value = pos+ Vector3.new(0, 1, 0)}
+														}
+													}
+													OptimizedAttackData(Data)
+												end
+												MutiAuraFunction(Delay,isAde,v,pos,dir,actualRoot,sword)
+											else
+												if isAde then
+													local Data = {
+														weapon = sword.tool,
+														chargedAttack = {chargeRatio = 0},
+														entityInstance = v.Character,
+														validate = {
+															raycast = {cameraPosition = {value = pos + Vector3.new(0, 2, 0)}, cursorDirection = {value = dir}},
+															targetPosition = {value = actualRoot.Position},
+															selfPosition = {value = pos+ Vector3.new(0, 1, 0)}
+														}
+													}
+													OptimizedAttackData(Data)
+												else
+													local Data = {
+														weapon = sword.tool,
+														chargedAttack = {chargeRatio = 0},
+														entityInstance = v.Character,
+														validate = {
+															raycast = {cameraPosition = {value = pos + Vector3.new(0, 2, 0)}, cursorDirection = {value = dir}},
+															targetPosition = {value = actualRoot.Position},
+															selfPosition = {value = pos+ Vector3.new(0, 1, 0)}
+														}
+													}
+													OptimizedAttackData(Data)
+												end
+											end
+										end
+									else
+										if SyncHit.Enabled  then Q = 0.35 else Q = 0.5 end
+										if AirHit.Enabled or ClosetMode.Enabled then
+												local chance = math.random(0,100)
+												local state = v.Character.Humanoid:GetState()
+												if state == Enum.HumanoidStateType.Jumping then
+													if chance > AirHitsChance.Value then 
+														CanHit = false
+														continue
+													else
+														CanHit = true
+													end
+												elseif state == Enum.HumanoidStateType.Freefall then
+													if chance > AirHitsChance.Value then
+														CanHit = false 
+														continue 
+													else
+														CanHit = true
+													end
+												else
+													CanHit = true
+												end
+											else
+												CanHit = true
+											end
+											if CanHit then
+												if isAde then
+													local Data = {
+														weapon = sword.tool,
+														chargedAttack = {chargeRatio = 0},
+														entityInstance = v.Character,
+														validate = {
+															raycast = {cameraPosition = {value = pos + Vector3.new(0, 2, 0)}, cursorDirection = {value = dir}},
+															targetPosition = {value = actualRoot.Position},
+															selfPosition = {value = pos+ Vector3.new(0, 1, 0)}
+														}
+													}
+													OptimizedAttackData(Data)
+												else
+													local Data = {
+														weapon = sword.tool,
+														chargedAttack = {chargeRatio = 0},
+														entityInstance = v.Character,
+														validate = {
+															raycast = {cameraPosition = {value = pos + Vector3.new(0, 2, 0)}, cursorDirection = {value = dir}},
+															targetPosition = {value = actualRoot.Position},
+															selfPosition = {value = pos+ Vector3.new(0, 1, 0)}
+														}
+													}
+													OptimizedAttackData(Data)
+												end
+												local currentSwingSpeed = ChargeTime.Value
+												local minSwingDelay = math.max(currentSwingSpeed, 0.05)
+												
+												if not SyncHit.Enabled or (tick() - CurrentSwingTICK) >= minSwingDelay then
+													CurrentSwingTICK = tick()
+												end
+											end
+									end
+								end
+							end
+						else
+							if LastAuraTarget and not AfterSwingDone and ASOPT.Enabled and meta then
+								AfterSwingDone = true
+								task.spawn(function()
+									for i = 1, ASMS.GetRandomValue() do
+										if not Killaura.Enabled then break end
+										if not entitylib.isAlive then break end
+										bedwars.SwordController:playSwordEffect(meta, false)
+										task.wait(math.max(ChargeTime.Value * 0.35, 0.045))
+									end
+								end)
+							end
+							LastAuraTarget = nil
+						end
+					end
+
+					for i, v in Boxes do
+						v.Adornee = attacked[i] and attacked[i].Entity.RootPart or nil
+						if v.Adornee then
+							v.Color3 = Color3.fromHSV(attacked[i].Check.Hue, attacked[i].Check.Sat, attacked[i].Check.Value)
+							v.Transparency = 1 - attacked[i].Check.Opacity
+						end
+					end
+
+					for i, v in Particles do
+						v.Position = attacked[i] and attacked[i].Entity.RootPart.Position or Vector3.new(9e9, 9e9, 9e9)
+						v.Parent = attacked[i] and gameCamera or nil
+					end
+
+					if Face.Enabled and attacked[1] then
+						local vec = attacked[1].Entity.RootPart.Position * Vector3.new(1, 0, 1)
+						entitylib.character.RootPart.CFrame = CFrame.lookAt(entitylib.character.RootPart.Position, Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.001, vec.Z))
+					end
+					local tme = 0
+					if SyncHit.Enabled then
+						tme = math.random()
+					elseif ClosetMode.Enabled then
+						tme = (-0.0042)
+					else
+						tme = 0
+					end
+					task.wait(1 / UpdateRate.Value - (tme))
+				until not Killaura.Enabled
+			else
+				restoreSwordState()
+				for _, v in Boxes do
+					v.Adornee = nil
+				end
+				for _, v in Particles do
+					v.Parent = nil
+				end
+				if inputService.TouchEnabled then
+					pcall(function()
+						lplr.PlayerGui.MobileUI['2'].Visible = true
+					end)
+				end
+				if armC0 then
+					AnimTween = tweenService:Create(gameCamera.Viewmodel.RightHand.RightWrist, TweenInfo.new(AnimationTween.Enabled and 0.001 or 0.3, Enum.EasingStyle.Exponential), {
+						C0 = armC0
+					})
+					AnimTween:Play()
+				end
+			end
+		end,
+		Tooltip = 'Attack players around you\nwithout aiming at them.'
+	})
+	Targets = Killaura:CreateTargets({
+		Players = true,
+		NPCs = true
+	})
+	local methods = {'Damage', 'Distance'}
+	for i in sortmethods do
+		if not table.find(methods, i) then
+			table.insert(methods, i)
+		end
+	end
+
+	HR = Killaura:CreateSlider({
+		Name = 'Hit Registration',
+		Min = 1,
+		Max = 36,
+		Default = 36,
+		Darker = true,
+		Function = function(val)
+			local function RegMath(sliderValue)
+				local minValue1 = 0.022
+				local maxValue1 = 0.025
+
+				local minValue2 = 0.0022
+				local maxValue2 = 0.0025
+
+				local steps = 52
+
+				local value1 = minValue1 + ((sliderValue - 1) * ((maxValue1 - minValue1) / steps * 0.98))
+				local value2 = minValue2 + ((sliderValue - 1) * ((maxValue2 - minValue2) / steps * 0.98))
+
+				return math.abs(value1), math.abs(value2)
+			end
+
+			if Killaura.Enabled then
+				local v1,v2 = RegMath(val)
+				HRTR[1] = v1
+				HRTR[2] = v2
+			end
+		end
+	})
+	HitRegOption = Killaura:CreateToggle({
+		Name = "Hit Registration Option",
+		Default = true,
+		Tooltip = 'enables the custom hit registration feature',
+		Function = function(v)
+			HR.Object.Visible = v
+		end
+	})
+	AirHitsChance = Killaura:CreateSlider({
+		Name = 'Air Hits Chance',
+		Min = 0,
+		Max = 100,
+		Default = 100,
+		Suffix = "%",
+		Decimal = 5,
+		Tooltip = 'checks if it can hit someone when they are in the air',
+		Darker = true
+	})
+	AirHit = Killaura:CreateToggle({
+		Name = "Air Hits",
+		Default = true,
+		Tooltip = 'enables the air hits feature',
+		Function = function(v)
+			AirHitsChance.Object.Visible = v
+		end
+	})
+	ASMS = Killaura:CreateTwoSlider({
+		Name = 'After Swing Amount',
+		Min = 0,
+		Max = 12,
+		DefaultMin = 4,
+		DefaultMax = 10,
+		Tooltip = 'keeps swinging based X amount of times',
+		Darker = true,
+		Visible = false
+	})
+	ASOPT = Killaura:CreateToggle({
+		Name = "After Swing",
+		Default = false,
+		Tooltip = 'enables the after swing feature',
+		Function = function(v)
+			ASMS.Object.Visible = v
+		end
+	})
+	local MaxRange = 0
+	local CE = false
+	if role ~= "owner" and role ~= "coowner" and role ~= "admin" and role ~= "friend" and role ~= "premium" and role ~= "user"  then
+		MaxRange = 12
+		CE = false
+		SyncHit = {Enabled = false}
+	elseif role == "user" then
+		MaxRange = 16
+		CE = false
+		SyncHit = Killaura:CreateToggle({
+			Name = 'Sync Hit-Time',
+			Tooltip = "Synchronize's ur hit time",
+			Default = false,
+		})
+	elseif role == "premium" then
+		MaxRange = 17
+		CE = true
+		SyncHit = Killaura:CreateToggle({
+			Name = 'Sync Hit-Time',
+			Tooltip = "Synchronize's ur hit time",
+			Default = false,
+		})
+	elseif role == "friend" or role == "admin" or role == "coowner" or role == "owner" then
+		MaxRange = 20
+		CE = true
+		SyncHit = Killaura:CreateToggle({
+			Name = 'Sync Hit-Time',
+			Tooltip = "Synchronize's ur hit time",
+			Default = false,
+		})
+	else
+		MaxRange = 12
+		SyncHit = {Enabled = false}
+	end
+
+	SwingRange = Killaura:CreateSlider({
+		Name = 'Swing range',
+		Min = 1,
+		Edit = CE,
+		Max = 32,
+		Default = 18,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end,
+		Function = function(val)
+			if Visualiser and VisualiserRange.Enabled then
+				Visualiser.Size = Vector3.new(val * 0.7, 0.01, val * 0.7)
+			else
+				--warn('jewish boy')
+			end
+		end
+	})
+	AttackRange = Killaura:CreateSlider({
+		Name = 'Attack range',
+		Min = 1,
+		Max = MaxRange,
+		Edit = CE,
+		Default = 18,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
+	})
+	ChargeTime = Killaura:CreateSlider({
+		Name = 'Swing time',
+		Min = 0,
+		Max = 1.5,
+		Default = 0.3,
+		Decimal = 100
+	})
+	AngleSlider = Killaura:CreateSlider({
+		Name = 'Max angle',
+		Min = 1,
+		Max = 360,
+		Default = 360
+	})
+	MutiAuraDelay = Killaura:CreateSlider({
+		Name = "Muti Aura Delay",
+		Min = 0,
+		Max = 1000,
+		Default = 250,
+		Darker = true,
+		Suffix = 'ms',
+		Visible = false
+	})
+	MutiAura = Killaura:CreateToggle({
+		Name = "MutiAura",
+		Tooltip = 'you need projectiles for this',
+		Default = false,
+
+		Function = function(v)
+			MutiAuraDelay.Object.Visible = v
+		end
+	})
+	SwitchDelay = Killaura:CreateSlider({
+		Name = 'Switch Delay',
+		Min = 0,
+		Max = 3,
+		Default = 0.15,
+		Decimal = 5,
+		Suffix = 'ms',
+		Visible = false
+	})				
+	AttackMode = Killaura:CreateDropdown({
+		Name = "AttackMode",
+		List = {'Single','Multi','Switch'},
+		Default = 'Multi',
+		Tooltip = 'Single only attacks one player\nMulti is just the legacy act in ka\nSwitch cycles between targets',
+		Function = function()
+			local v = AttackMode.Value
+			SwitchDelay.Object.Visible = v == "Switch"
+			print(SwitchDelay.Object.Visible)
+		end
+	})
+	UpdateRate = Killaura:CreateSlider({
+		Name = 'Update rate',
+		Min = 1,
+		Max = 360,
+		Default = 60,
+		Suffix = 'hz'
+	})
+	MaxTargets = Killaura:CreateSlider({
+		Name = 'Max targets',
+		Min = 1,
+		Max = 8,
+		Default = 5
+	})
+	Sort = Killaura:CreateDropdown({
+		Name = 'Target Mode',
+		List = methods
+	})
+	ACheck = Killaura:CreateToggle({Name = 'Attackable Check',Tooltip='checks if the current target is possible to hit'})
+	Mouse = Killaura:CreateToggle({Name = 'Require mouse down'})
+	Swing = Killaura:CreateToggle({Name = 'No Swing'})
+	GUI = Killaura:CreateToggle({Name = 'GUI check'})
+	VisualiserRange = Killaura:CreateToggle({
+        Name = "Range Visualiser",
+        Function = function(cb)
+            if cb then
+                createRangeCircle()
+            else
+                if Visualiser then
+                    Visualiser:Destroy()
+                    Visualiser = nil
+                end
+            end
+        end
+    })
+	Killaura:CreateToggle({
+		Name = 'Show target',
+		Function = function(callback)
+			BoxSwingColor.Object.Visible = callback
+			BoxAttackColor.Object.Visible = callback
+			if callback then
+				for i = 1, 10 do
+					local box = Instance.new('BoxHandleAdornment')
+					box.Adornee = nil
+					box.AlwaysOnTop = true
+					box.Size = Vector3.new(3, 5, 3)
+					box.CFrame = CFrame.new(0, -0.5, 0)
+					box.ZIndex = 0
+					box.Parent = vape.gui
+					Boxes[i] = box
+				end
+			else
+				for _, v in Boxes do
+					v:Destroy()
+				end
+				table.clear(Boxes)
+			end
+		end
+	})
+	BoxSwingColor = Killaura:CreateColorSlider({
+		Name = 'Target Color',
+		Darker = true,
+		DefaultHue = 0.6,
+		DefaultOpacity = 0.5,
+		Visible = false
+	})
+	BoxAttackColor = Killaura:CreateColorSlider({
+		Name = 'Attack Color',
+		Darker = true,
+		DefaultOpacity = 0.5,
+		Visible = false
+	})
+	Killaura:CreateToggle({
+		Name = 'Target particles',
+		Function = function(callback)
+			ParticleTexture.Object.Visible = callback
+			ParticleColor1.Object.Visible = callback
+			ParticleColor2.Object.Visible = callback
+			ParticleSize.Object.Visible = callback
+			if callback then
+				for i = 1, 10 do
+					local part = Instance.new('Part')
+					part.Size = Vector3.new(2, 4, 2)
+					part.Anchored = true
+					part.CanCollide = false
+					part.Transparency = 1
+					part.CanQuery = false
+					part.Parent = Killaura.Enabled and gameCamera or nil
+					local particles = Instance.new('ParticleEmitter')
+					particles.Brightness = 1.5
+					particles.Size = NumberSequence.new(ParticleSize.Value)
+					particles.Shape = Enum.ParticleEmitterShape.Sphere
+					particles.Texture = ParticleTexture.Value
+					particles.Transparency = NumberSequence.new(0)
+					particles.Lifetime = NumberRange.new(0.4)
+					particles.Speed = NumberRange.new(16)
+					particles.Rate = 128
+					particles.Drag = 16
+					particles.ShapePartial = 1
+					particles.Color = ColorSequence.new({
+						ColorSequenceKeypoint.new(0, Color3.fromHSV(ParticleColor1.Hue, ParticleColor1.Sat, ParticleColor1.Value)),
+						ColorSequenceKeypoint.new(1, Color3.fromHSV(ParticleColor2.Hue, ParticleColor2.Sat, ParticleColor2.Value))
+					})
+					particles.Parent = part
+					Particles[i] = part
+				end
+			else
+				for _, v in Particles do
+					v:Destroy()
+				end
+				table.clear(Particles)
+			end
+		end
+	})
+	ParticleTexture = Killaura:CreateTextBox({
+		Name = 'Texture',
+		Default = 'rbxassetid://14736249347',
+		Function = function()
+			for _, v in Particles do
+				v.ParticleEmitter.Texture = ParticleTexture.Value
+			end
+		end,
+		Darker = true,
+		Visible = false
+	})
+	ParticleColor1 = Killaura:CreateColorSlider({
+		Name = 'Color Begin',
+		Function = function(hue, sat, val)
+			for _, v in Particles do
+				v.ParticleEmitter.Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, Color3.fromHSV(hue, sat, val)),
+					ColorSequenceKeypoint.new(1, Color3.fromHSV(ParticleColor2.Hue, ParticleColor2.Sat, ParticleColor2.Value))
+				})
+			end
+		end,
+		Darker = true,
+		Visible = false
+	})
+	ParticleColor2 = Killaura:CreateColorSlider({
+		Name = 'Color End',
+		Function = function(hue, sat, val)
+			for _, v in Particles do
+				v.ParticleEmitter.Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, Color3.fromHSV(ParticleColor1.Hue, ParticleColor1.Sat, ParticleColor1.Value)),
+					ColorSequenceKeypoint.new(1, Color3.fromHSV(hue, sat, val))
+				})
+			end
+		end,
+		Darker = true,
+		Visible = false
+	})
+	ParticleSize = Killaura:CreateSlider({
+		Name = 'Size',
+		Min = 0,
+		Max = 1,
+		Default = 0.2,
+		Decimal = 100,
+		Function = function(val)
+			for _, v in Particles do
+				v.ParticleEmitter.Size = NumberSequence.new(val)
+			end
+		end,
+		Darker = true,
+		Visible = false
+	})
+	Face = Killaura:CreateToggle({Name = 'Face target'})
+	Animation = Killaura:CreateToggle({
+		Name = 'Custom Animation',
+		Function = function(callback)
+			AnimationMode.Object.Visible = callback
+			AnimationTween.Object.Visible = callback
+			AnimationSpeed.Object.Visible = callback
+			if Killaura.Enabled then
+				Killaura:Toggle()
+				Killaura:Toggle()
+			end
+		end
+	})
+	local animnames = {}
+	for i in anims do
+		table.insert(animnames, i)
+	end
+	AnimationMode = Killaura:CreateDropdown({
+		Name = 'Animation Mode',
+		List = animnames,
+		Darker = true,
+		Visible = false
+	})
+	AnimationSpeed = Killaura:CreateSlider({
+		Name = 'Animation Speed',
+		Min = 0,
+		Max = 2,
+		Default = 1,
+		Decimal = 10,
+		Darker = true,
+		Visible = false
+	})
+	AnimationTween = Killaura:CreateToggle({
+		Name = 'No Tween',
+		Darker = true,
+		Visible = false
+	})
+	Limit = Killaura:CreateToggle({
+		Name = 'Limit to items',
+		Function = function(callback)
+			if inputService.TouchEnabled and Killaura.Enabled then
+				pcall(function()
+					lplr.PlayerGui.MobileUI['2'].Visible = callback
+				end)
+			end
+		end,
+		Tooltip = 'Only attacks when the sword is held'
+	})
+
+	LegitAura = Killaura:CreateToggle({
+		Name = 'Legit Aura',
+		Tooltip = 'Only attacks when the mouse is clicking'
+	})
+	SC = Killaura:CreateToggle({Name='Sigird Check',Default=true})
+	ClosetMode = Killaura:CreateToggle({Name='Closet Mode',Default=false})
+	SophiaCheck = Killaura:CreateToggle({
+		Name='Sophia Check',
+		Default=true,
+		Function = function(v)
+			if not v then
+				CURRENT_LEVEL_FROZEN = 0
+			end
+		end
+	})
+
+end)
 -- Nerv8 block 30: [Exploits] PlayerData
 
 
