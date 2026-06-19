@@ -34515,6 +34515,52 @@ run(function()
 	local FROZEN_THRESHOLD = 10
 	local CURRENT_LEVEL_FROZEN = 0
 	local CurrentSwingTICK = 0
+	local originalLastAttack, originalLastSwingServerTime
+	local originalSwordEffectKnit, originalScytheKnit
+	local function restoreSwordState()
+		CURRENT_LEVEL_FROZEN = 0
+		store.KillauraTarget = nil
+		Attacking = false
+		CanHit = true
+		LastAuraTarget = nil
+		AfterSwingDone = false
+		CurrentSwingTICK = 0
+		if bedwars.SwordController then
+			if originalLastAttack ~= nil then
+				bedwars.SwordController.lastAttack = originalLastAttack
+			end
+			bedwars.SwordController.lastSwingServerTime = originalLastSwingServerTime or workspace:GetServerTimeNow()
+			pcall(function()
+				bedwars.SwordController.disableSwingState = false
+			end)
+			pcall(function()
+				bedwars.SwordController.isSwinging = false
+			end)
+			pcall(function()
+				bedwars.SwordController:toggleSwordSwing(true)
+			end)
+		end
+		pcall(function()
+			if originalSwordEffectKnit ~= nil then
+				debug.setupvalue(oldSwing or bedwars.SwordController.playSwordEffect, 6, originalSwordEffectKnit)
+			end
+		end)
+		pcall(function()
+			if originalScytheKnit ~= nil then
+				debug.setupvalue(bedwars.ScytheController.playLocalAnimation, 3, originalScytheKnit)
+			end
+		end)
+		pcall(function()
+			if bedwars.InventoryViewmodelController and bedwars.Store then
+				bedwars.InventoryViewmodelController:handleStore(bedwars.Store:getState())
+			end
+		end)
+		pcall(function()
+			if bedwars.ViewmodelController and bedwars.ViewmodelController.playAnimation then
+				bedwars.ViewmodelController:playAnimation(0)
+			end
+		end)
+	end
     task.spawn(function()
         AttackRemote = bedwars.Client:Get(remotes.AttackEntity)
     end)
@@ -34538,7 +34584,7 @@ run(function()
 		end
 
 		if LegitAura.Enabled or ClosetMode.Enabled then
-			if (tick() - bedwars.SwordController.lastSwing) >= 0.2 then
+			if (tick() - (bedwars.SwordController.lastSwing or 0)) >= 0.2 then
 				CanHit = false
 				return false 
 			else
@@ -34692,6 +34738,8 @@ run(function()
 		Name = 'Killaura',
 		Function = function(callback)
 			if callback then
+				originalLastAttack = bedwars.SwordController and bedwars.SwordController.lastAttack or nil
+				originalLastSwingServerTime = bedwars.SwordController and bedwars.SwordController.lastSwingServerTime or nil
 				if inputService.TouchEnabled then
 					pcall(function()
 						lplr.PlayerGui.MobileUI['2'].Visible = Limit.Enabled
@@ -34706,14 +34754,29 @@ run(function()
 									return not Attacking
 								end,
 								playAnimation = function(...)
-									if not Attacking then
-										bedwars.ViewmodelController:playAnimation(select(2, ...))
+
+									local animation = select(2, ...) or select(1, ...)
+
+									if not Attacking and animation then
+
+										bedwars.ViewmodelController:playAnimation(animation)
+
 									end
+
 								end
 							}
 						}
 					}
+					local _, swordEffectKnit = debug.getupvalue(oldSwing or bedwars.SwordController.playSwordEffect, 6)
+
+					local _, scytheKnit = debug.getupvalue(bedwars.ScytheController.playLocalAnimation, 3)
+
+					originalSwordEffectKnit = swordEffectKnit
+
+					originalScytheKnit = scytheKnit
+
 					debug.setupvalue(oldSwing or bedwars.SwordController.playSwordEffect, 6, fake)
+
 					debug.setupvalue(bedwars.ScytheController.playLocalAnimation, 3, fake)
 
 					task.spawn(function()
@@ -34855,7 +34918,9 @@ run(function()
 									local pos = selfpos + dir * math.max(delta.Magnitude - 14.399, 0)
 									swingCooldown = SyncHit.Enabled and (tick() - HRTR[1]) or tick()
 									bedwars.SwordController.lastAttack = workspace:GetServerTimeNow()
-									bedwars.SwordController.lastSwingServerTime = SyncHit.Enabled and workspace:GetServerTimeNow() - HRTR[2] or workspace:GetServerTimeNow() - tick()
+										if SyncHit.Enabled then
+											bedwars.SwordController.lastSwingServerTime = workspace:GetServerTimeNow() - HRTR[2]
+										end
 									store.attackReach = SyncHit.Enabled and ((delta.Magnitude * 100) // 1 / 100 - HRTR[1] - 0.055) or (delta.Magnitude * 100) // 1 / 100
 									store.attackReachUpdate = SyncHit.Enabled and (tick() + 1 - HRTR[2]) or tick() 
 									if not SyncHit.Enabled or (tick() - CurrentSwingTICK) >= 0.1 then
@@ -35052,8 +35117,7 @@ run(function()
 					task.wait(1 / UpdateRate.Value - (tme))
 				until not Killaura.Enabled
 			else
-				CURRENT_LEVEL_FROZEN = 0
-				store.KillauraTarget = nil
+				restoreSwordState()
 				for _, v in Boxes do
 					v.Adornee = nil
 				end
@@ -35065,9 +35129,6 @@ run(function()
 						lplr.PlayerGui.MobileUI['2'].Visible = true
 					end)
 				end
-				debug.setupvalue(oldSwing or bedwars.SwordController.playSwordEffect, 6, bedwars.Knit)
-				debug.setupvalue(bedwars.ScytheController.playLocalAnimation, 3, bedwars.Knit)
-				Attacking = false
 				if armC0 then
 					AnimTween = tweenService:Create(gameCamera.Viewmodel.RightHand.RightWrist, TweenInfo.new(AnimationTween.Enabled and 0.001 or 0.3, Enum.EasingStyle.Exponential), {
 						C0 = armC0
