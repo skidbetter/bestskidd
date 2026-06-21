@@ -34487,8 +34487,8 @@ run(function()
 	local ACheck
 	local VisualiserRange
 	local HRTR = {
-		[1] = 0.042,
-		[2] = 0.0042,
+		[1] = 0.012,
+		[2] = 0.0012,
 	}
 	local AttackMode
 	local LegitAura = {}
@@ -34592,8 +34592,9 @@ run(function()
 			return true
 		end
 		local currentTime = tick()
-		local delayBetweenHits = (10 / HR.Value) * 0.98
-		if HR.Value >= 36 then
+		local hitRate = math.max(HR.Value, 1)
+		local delayBetweenHits = math.max((1 / hitRate) * 0.72, 0.004)
+		if hitRate >= 120 then
 			return true
 		end
 		if currentTime - lastCustomHitTime >= delayBetweenHits then
@@ -35342,8 +35343,8 @@ run(function()
 	HR = Killaura:CreateSlider({
 		Name = 'Hit Registration',
 		Min = 1,
-		Max = 36,
-		Default = 36,
+		Max = 240,
+		Default = 240,
 		Darker = true,
 		Function = function(val)
 			local function RegMath(sliderValue)
@@ -35353,7 +35354,7 @@ run(function()
 				local minValue2 = 0.0022
 				local maxValue2 = 0.0025
 
-				local steps = 52
+				local steps = 240
 
 				local value1 = minValue1 + ((sliderValue - 1) * ((maxValue1 - minValue1) / steps * 0.98))
 				local value2 = minValue2 + ((sliderValue - 1) * ((maxValue2 - minValue2) / steps * 0.98))
@@ -35412,19 +35413,19 @@ run(function()
 			ASMS.Object.Visible = v
 		end
 	})
-	local MaxRange = 20
+	local MaxRange = 100
 	local CE = true
 	SyncHit = Killaura:CreateToggle({
 		Name = 'Sync Hit-Time',
 		Tooltip = "Synchronize's ur hit time",
-		Default = false,
+		Default = true,
 	})
 	SwingRange = Killaura:CreateSlider({
 		Name = 'Swing range',
 		Min = 1,
 		Edit = CE,
-		Max = 32,
-		Default = 18,
+		Max = MaxRange,
+		Default = MaxRange,
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
@@ -35439,7 +35440,7 @@ run(function()
 		Min = 1,
 		Max = MaxRange,
 		Edit = CE,
-		Default = 18,
+		Default = MaxRange,
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end
@@ -35448,7 +35449,7 @@ run(function()
 		Name = 'Swing time',
 		Min = 0,
 		Max = 1.5,
-		Default = 0.3,
+		Default = 0.01,
 		Decimal = 100
 	})
 	AngleSlider = Killaura:CreateSlider({
@@ -35461,7 +35462,7 @@ run(function()
 		Name = "Muti Aura Delay",
 		Min = 0,
 		Max = 1000,
-		Default = 250,
+		Default = 0,
 		Darker = true,
 		Suffix = 'ms',
 		Visible = false
@@ -35470,7 +35471,7 @@ run(function()
 		Name = "Muti Aura Chance",
 		Min = 0,
 		Max = 100,
-		Default = 58,
+		Default = 0,
 		Darker = true,
 		Suffix = '%',
 		Visible = false
@@ -35489,7 +35490,7 @@ run(function()
 		Name = 'Switch Delay',
 		Min = 0,
 		Max = 3,
-		Default = 0.15,
+		Default = 0,
 		Decimal = 5,
 		Suffix = 'ms',
 		Visible = false
@@ -35513,15 +35514,15 @@ run(function()
 	UpdateRate = Killaura:CreateSlider({
 		Name = 'Update rate',
 		Min = 1,
-		Max = 360,
-		Default = 60,
+		Max = 1000,
+		Default = 1000,
 		Suffix = 'hz'
 	})
 	MaxTargets = Killaura:CreateSlider({
 		Name = 'Max targets',
 		Min = 1,
-		Max = 8,
-		Default = 5
+		Max = 50,
+		Default = 50
 	})
 	Sort = Killaura:CreateDropdown({
 		Name = 'Target Mode',
