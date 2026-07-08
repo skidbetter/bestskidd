@@ -47,7 +47,7 @@ local function downloadFile(path, func)
 		local success = false
 		for attempt = 1, 3 do
 			local suc, result = pcall(function()
-				return game:HttpGet('https://raw.githubusercontent.com/R12sa/R12SAVapeV4/' .. readfile('newvape/profiles/commit.txt') .. '/' .. select(1, path:gsub('newvape/', '')), true)
+				return game:HttpGet('https://raw.githubusercontent.com/skidbetter/bestskidd/' .. readfile('newvape/profiles/commit.txt') .. '/' .. select(1, path:gsub('newvape/', '')), true)
 			end)
 			if suc and result ~= '404: Not Found' then
 				res = result
@@ -109,13 +109,13 @@ pcall(migrateProfiles)
 --[[ ===== ANTILAG PERFORMANCE MODULE ===== ]]
 local antilag = {}
 local RunService = cloneref(game:GetService('RunService'))
-local antilagState = shared.R12SAAntilagState or {
+local antilagState = shared.skidAntilagState or {
 	deltaTime = 0,
 	lastFrameTime = tick(),
 	renderFrameCount = 0,
 	running = false
 }
-shared.R12SAAntilagState = antilagState
+shared.skidAntilagState = antilagState
 
 -- Anti-lag config
 local ANTILAG_CONFIG = {
@@ -188,7 +188,7 @@ local function finishLoading()
 				repeat task.wait() until game:IsLoaded()
 				if getgenv and not getgenv().shared then getgenv().shared = {} end
 				shared.vapereload = true
-				loadstring(game:HttpGet('https://raw.githubusercontent.com/R12sa/R12SAVapeV4/'..readfile('newvape/profiles/commit.txt')..'/loader.lua', true), 'loader')()
+				loadstring(game:HttpGet('https://raw.githubusercontent.com/skidbetter/bestskidd/'..readfile('newvape/profiles/commit.txt')..'/loader.lua', true), 'loader')()
 			]]
 			if shared.VapeDeveloper then
 				teleportScript = 'shared.VapeDeveloper = true\n' .. teleportScript
@@ -214,7 +214,7 @@ local function finishLoading()
 				while tick() < deadline do
 					task.wait(0.5)
 				end
-				vape:CreateNotification('[R12SA V4] Finished Loading', name .. (vape.VapeButton and 'Press the button in the top right to open GUI' or 'Press F5 to open GUI'), 10)
+				vape:CreateNotification('[skid] Finished Loading', name .. (vape.VapeButton and 'Press the button in the top right to open GUI' or 'Press F5 to open GUI'), 10)
 			end)
 		end
 	end
@@ -247,18 +247,18 @@ if not guiFunc then
 		end
 		context = '\n\nContext:\n' .. table.concat(parts, '\n')
 	end
-	error('[R12SA V4] syntax error in ' .. gui .. '.lua' .. '\n' .. errMsg .. context)
+	error('[skid] syntax error in ' .. gui .. '.lua' .. '\n' .. errMsg .. context)
 end
 vape = guiFunc()
 if not vape then
-	error('[R12SA V4] GUI returned nil file may be corrupted try deleting newvape/guis/' .. gui .. '.lua and reinjecting.')
+	error('[skid] GUI returned nil file may be corrupted try deleting newvape/guis/' .. gui .. '.lua and reinjecting.')
 end
 if not vape.Load then
 	if delfile then pcall(function() delfile('newvape/guis/' .. gui .. '.lua') end) end
-	error('[R12SA V4] gui file corrupted (missing load) reinject..')
+	error('[skid] gui file corrupted (missing load) reinject..')
 end
 if not vape.Init and not vape.Load then
-	error('[R12SA V4] failed to initialize properly reinject to fix this bs')
+	error('[skid] failed to initialize properly reinject to fix this bs')
 end
 shared.vape = vape
 vape:Clean(function()
@@ -295,7 +295,7 @@ if not shared.VapeIndependent then
 	else
 		if not shared.VapeDeveloper then
 			local suc, res = pcall(function()
-				return game:HttpGet('https://raw.githubusercontent.com/R12sa/R12SAVapeV4/' .. readfile('newvape/profiles/commit.txt') .. '/games/' .. gameFileId .. '.lua', true)
+				return game:HttpGet('https://raw.githubusercontent.com/skidbetter/bestskidd/' .. readfile('newvape/profiles/commit.txt') .. '/games/' .. gameFileId .. '.lua', true)
 			end)
 			if suc and res ~= '404: Not Found' then
 				loadstring(downloadFile('newvape/games/' .. gameFileId .. '.lua'), tostring(gameFileId))(...)
